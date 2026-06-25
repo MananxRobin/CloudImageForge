@@ -1,0 +1,270 @@
+{
+  "generated_from": "Ubuntu Archive / Launchpad getPublishedSources snapshot for CloudImageForge tests and offline resolution",
+  "series": ["jammy", "noble"],
+  "releases": {
+    "jammy": {
+      "version": "22.04",
+      "packages": {
+        "libc6": {
+          "version": "2.35-0ubuntu3.8",
+          "depends": "",
+          "essential": true,
+          "component": "main",
+          "description": "GNU C Library: Shared libraries"
+        },
+        "dpkg": {
+          "version": "1.21.1ubuntu2.3",
+          "depends": "libc6 (>= 2.34)",
+          "essential": true,
+          "component": "main"
+        },
+        "bash": {
+          "version": "5.1-6ubuntu1.1",
+          "depends": "libc6 (>= 2.34), debianutils",
+          "essential": true,
+          "component": "main"
+        },
+        "debianutils": {
+          "version": "5.5-1ubuntu2",
+          "depends": "libc6 (>= 2.34)",
+          "essential": true,
+          "component": "main"
+        },
+        "coreutils": {
+          "version": "8.32-4ubuntu2",
+          "depends": "libc6 (>= 2.34)",
+          "essential": true,
+          "component": "main"
+        },
+        "tar": {
+          "version": "1.34+dfsg-1ubuntu0.1.22.04.2",
+          "depends": "libc6 (>= 2.34)",
+          "essential": true,
+          "component": "main"
+        },
+        "gzip": {
+          "version": "1.10-4ubuntu4.2",
+          "depends": "libc6 (>= 2.34)",
+          "essential": true,
+          "component": "main"
+        },
+        "apt": {
+          "version": "2.4.13",
+          "depends": "libc6 (>= 2.34), gpgv, ubuntu-keyring",
+          "essential": false,
+          "component": "main"
+        },
+        "gpgv": {
+          "version": "2.2.27-3ubuntu2.1",
+          "depends": "libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "ubuntu-keyring": {
+          "version": "2021.03.26",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        },
+        "python3-minimal": {
+          "version": "3.10.6-1~22.04.1",
+          "depends": "python3.10-minimal, dpkg (>= 1.13.5)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3.10-minimal": {
+          "version": "3.10.12-1~22.04.8",
+          "depends": "libc6 (>= 2.35)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3": {
+          "version": "3.10.6-1~22.04.1",
+          "depends": "python3-minimal (= 3.10.6-1~22.04.1), libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3-yaml": {
+          "version": "5.4.1-1ubuntu1",
+          "depends": "python3 (>= 3.10), libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main",
+          "component_note": "universe"
+        },
+        "ca-certificates": {
+          "version": "20240203~22.04.1",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        },
+        "openssl": {
+          "version": "3.0.2-0ubuntu1.18",
+          "depends": "libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "libssl3": {
+          "version": "3.0.2-0ubuntu1.18",
+          "depends": "libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "hello": {
+          "version": "2.10-2ubuntu4",
+          "depends": "libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "adduser": {
+          "version": "3.118ubuntu5",
+          "depends": "passwd, debconf",
+          "essential": false,
+          "component": "main"
+        },
+        "passwd": {
+          "version": "1:4.8.1-2ubuntu2.2",
+          "depends": "libc6 (>= 2.34)",
+          "essential": false,
+          "component": "main"
+        },
+        "debconf": {
+          "version": "1.5.79ubuntu1",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        }
+      }
+    },
+    "noble": {
+      "version": "24.04",
+      "packages": {
+        "libc6": {
+          "version": "2.39-0ubuntu8.4",
+          "depends": "",
+          "essential": true,
+          "component": "main"
+        },
+        "dpkg": {
+          "version": "1.22.6ubuntu6.1",
+          "depends": "libc6 (>= 2.38)",
+          "essential": true,
+          "component": "main"
+        },
+        "bash": {
+          "version": "5.2.21-2ubuntu4",
+          "depends": "libc6 (>= 2.38), debianutils",
+          "essential": true,
+          "component": "main"
+        },
+        "debianutils": {
+          "version": "5.17build1",
+          "depends": "libc6 (>= 2.38)",
+          "essential": true,
+          "component": "main"
+        },
+        "coreutils": {
+          "version": "9.4-3ubuntu6",
+          "depends": "libc6 (>= 2.38)",
+          "essential": true,
+          "component": "main"
+        },
+        "tar": {
+          "version": "1.35+dfsg-3build1",
+          "depends": "libc6 (>= 2.38)",
+          "essential": true,
+          "component": "main"
+        },
+        "gzip": {
+          "version": "1.12-1ubuntu3",
+          "depends": "libc6 (>= 2.38)",
+          "essential": true,
+          "component": "main"
+        },
+        "apt": {
+          "version": "2.7.14build2",
+          "depends": "libc6 (>= 2.38), gpgv, ubuntu-keyring",
+          "essential": false,
+          "component": "main"
+        },
+        "gpgv": {
+          "version": "2.4.4-2ubuntu17",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "ubuntu-keyring": {
+          "version": "2023.11.28.1",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        },
+        "python3-minimal": {
+          "version": "3.12.3-0ubuntu2",
+          "depends": "python3.12-minimal, dpkg (>= 1.13.5)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3.12-minimal": {
+          "version": "3.12.3-1ubuntu0.5",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3": {
+          "version": "3.12.3-0ubuntu2",
+          "depends": "python3-minimal (= 3.12.3-0ubuntu2), libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "python3-yaml": {
+          "version": "6.0.1-2build2",
+          "depends": "python3 (>= 3.12), libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "ca-certificates": {
+          "version": "20240203",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        },
+        "openssl": {
+          "version": "3.0.13-0ubuntu3.4",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "libssl3t64": {
+          "version": "3.0.13-0ubuntu3.4",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "hello": {
+          "version": "2.10-3build1",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "adduser": {
+          "version": "3.137ubuntu1",
+          "depends": "passwd, debconf",
+          "essential": false,
+          "component": "main"
+        },
+        "passwd": {
+          "version": "1:4.13+dfsg1-4ubuntu3.2",
+          "depends": "libc6 (>= 2.38)",
+          "essential": false,
+          "component": "main"
+        },
+        "debconf": {
+          "version": "1.5.86ubuntu1",
+          "depends": "",
+          "essential": false,
+          "component": "main"
+        }
+      }
+    }
+  }
+}

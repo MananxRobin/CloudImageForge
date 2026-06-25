@@ -1,0 +1,118 @@
+# CloudImageForge
+
+Python on Linux tool for Ubuntu 22.04 (jammy) and 24.04 (noble) cloud images:
+apt sources, Debian packaging (`dpkg-deb`, `sbuild`, `pbuilder`), and
+installability checks against the Ubuntu Archive (Launchpad
+`getPublishedSources`) dataset.
+
+Packages are **never published directly**. They go through a Launchpad-style
+staging archive. A fallback check boots a clean image (LXD or QEMU; CI uses
+the same resolver a guest would) so an apt dependency that resolved on a
+developer laptop cannot fail on a fresh cloud image after release.
+
+## Why staging (read this before you publish)
+
+An apt dependency **resolved locally but failed on a clean image**.
+
+The developer workstation already had `liblocalfoo1` installed from a local
+build. `apt-get install ./ciforge-agent.deb` succeeded. The same binary on a
+fresh Ubuntu 22.04 cloud image failed: `liblocalfoo1` is not in the Ubuntu
+Archive, and the image's apt sources do not include the laptop.
+
+Direct publish would have shipped that breakage to every public-cloud guest.
+CloudImageForge therefore:
+
+1. Builds the deb (`dpkg-deb`, or `sbuild`/`pbuilder` against the target series).
+2. Lands it in a **staging** pocket (Launchpad PPA / proposed-style).
+3. Runs the **fallback check** against a clean jammy/noble package index
+   (Essential packages + Archive), not against the host `dpkg` status.
+4. Boots the image (**LXD** or **QEMU**) and runs `apt-get update` so a
+   broken apt source is caught before release.
+5. Promotes from staging only when both checks pass.
+
+Reproduce the edge case:
+
+```bash
+ciforge stage add --control examples/host-only-agent/DEBIAN/control
+ciforge stage check --release jammy --host-status tests/fixtures/host-dpkg-status
+# error: Dependencies [liblocalfoo1] resolved on the local host but are not
+# installable on a clean Ubuntu jammy image.
+ciforge publish   # refused
+```
+
+A known-broken apt source is rejected the same way:
+
+```bash
+ciforge bootcheck --release jammy --backend simulate \
+    --apt-source tests/fixtures/broken-apt.list
+```
+
+## Install
+
+```bash
+python3 -m pip install -e ".[dev]"
+ciforge --help
+```
+
+On Ubuntu, build the native Debian package with `dpkg-buildpackage -us -uc`
+and run `autopkgtest` via `debian/tests/`.
+
+## Pipeline
+
+```bash
+# Catalog Ubuntu cloud images (SimpleStreams on cloud-images.ubuntu.com)
+ciforge image list --release jammy --cloud qemu
+ciforge image list --release noble --cloud lxd
+
+# Apt sources as a clean cloud image would see them
+ciforge apt render --release jammy --format list
+ciforge apt render --release noble --format deb822
+ciforge apt lint path/to/sources --release noble
+
+# Ubuntu Archive dataset (offline snapshot) or live Launchpad API
+ciforge archive query python3 --release jammy
+ciforge archive query hello --release noble --live
+
+# Build
+ciforge package build examples/ciforge-hello --backend dpkg-deb
+ciforge package build . --backend sbuild --release jammy --dsc foo.dsc --dry-run
+ciforge package build . --backend pbuilder --release noble --dsc foo.dsc --dry-run
+
+# Interoperability across 22.04 and 24.04
+ciforge validate --control examples/ciforge-hello/DEBIAN/control --releases jammy,noble
+
+# Stage, fallback-check, boot, publish
+ciforge pipeline examples/ciforge-hello --releases jammy,noble
+ciforge bootcheck --release jammy --backend lxd --dry-run
+ciforge bootcheck --release noble --backend qemu --dry-run
+```
+
+`sbuild` and `pbuilder` build against chroots populated from the Ubuntu
+Archive for the target series. `dpkg-deb` is the local binary backend (and
+the one CI uses). If `dpkg-deb` is not installed, CloudImageForge writes a
+`.deb` with the same `ar` + `control.tar.gz` + `data.tar.gz` layout.
+
+## Tests and CI
+
+| Job | What it runs |
+| --- | --- |
+| unit | `pytest tests/unit` on Ubuntu 22.04 / Python 3.10 and 24.04 / 3.12 |
+| functional | end-to-end build → stage → bootcheck → publish |
+| autopkgtest | `debian/tests/smoke` and `debian/tests/staging-fallback` |
+| sysadmin-check | `scripts/sysadmin-check.sh`: broken apt source, host-only dep, LXD/QEMU dry-run |
+
+```bash
+python3 -m pytest
+bash scripts/sysadmin-check.sh
+```
+
+## Community
+
+This repository is the coordination point for image and packaging work
+across jammy and noble. See [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/community.md](docs/community.md) for the release matrix, how to
+propose Archive dataset updates, and how we review staging failures.
+
+## License
+
+GPL-3.0-or-later. See [LICENSE](LICENSE) and [debian/copyright](debian/copyright).

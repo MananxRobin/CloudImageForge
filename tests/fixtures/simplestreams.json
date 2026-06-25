@@ -1,0 +1,52 @@
+{
+  "format": "products:1.0",
+  "content_id": "com.ubuntu.cloud:released:download",
+  "products": {
+    "com.ubuntu.cloud:server:22.04:amd64": {
+      "release": "jammy",
+      "version": "22.04",
+      "arch": "amd64",
+      "versions": {
+        "20240701": {
+          "items": {
+            "disk1.img": {
+              "ftype": "disk1.img",
+              "path": "releases/jammy/release-20240701/ubuntu-22.04-server-cloudimg-amd64.img",
+              "sha256": "abc",
+              "size": 600000000
+            },
+            "squashfs": {
+              "ftype": "squashfs",
+              "path": "releases/jammy/release-20240701/ubuntu-22.04-server-cloudimg-amd64.squashfs",
+              "sha256": "def",
+              "size": 200000000
+            }
+          }
+        }
+      }
+    },
+    "com.ubuntu.cloud:server:24.04:amd64": {
+      "release": "noble",
+      "version": "24.04",
+      "arch": "amd64",
+      "versions": {
+        "20240801": {
+          "items": {
+            "disk1.img": {
+              "ftype": "disk1.img",
+              "path": "releases/noble/release-20240801/ubuntu-24.04-server-cloudimg-amd64.img",
+              "sha256": "ghi",
+              "size": 650000000
+            },
+            "squashfs": {
+              "ftype": "squashfs",
+              "path": "releases/noble/release-20240801/ubuntu-24.04-server-cloudimg-amd64.squashfs",
+              "sha256": "jkl",
+              "size": 220000000
+            }
+          }
+        }
+      }
+    }
+  }
+}

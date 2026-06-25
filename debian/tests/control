@@ -1,0 +1,7 @@
+Tests: smoke
+Depends: python3-all, python3-pytest
+Restrictions: allow-stderr, rw-build-tree
+
+Tests: staging-fallback
+Depends: python3-all, python3-pytest
+Restrictions: allow-stderr, rw-build-tree

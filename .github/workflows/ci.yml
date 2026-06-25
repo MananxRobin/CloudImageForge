@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: unit (pytest ${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            python-version: "3.10"
+          - os: ubuntu-24.04
+            python-version: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Unit tests
+        run: python -m pytest tests/unit --cov=cloudimageforge --cov-report=term-missing
+
+  functional:
+    name: functional (pytest)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Functional pipeline tests
+        run: python -m pytest tests/functional -m functional
+
+  autopkgtest:
+    name: autopkgtest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package and autopkgtest
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update
+          sudo apt-get install -y autopkgtest
+          autopkgtest --version
+      - name: Run Debian autopkgtest scripts
+        run: |
+          chmod +x debian/tests/smoke debian/tests/staging-fallback
+          debian/tests/smoke
+          debian/tests/staging-fallback
+
+  sysadmin-check:
+    name: sysadmin boot check (LXD/QEMU + apt)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CloudImageForge and hypervisors
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils
+      - name: Catch broken apt source and host-only dependency
+        run: bash scripts/sysadmin-check.sh
+      - name: LXD/QEMU command dry-run (guest boot path)
+        run: |
+          ciforge bootcheck --release jammy --backend lxd --dry-run
+          ciforge bootcheck --release noble --backend qemu --dry-run
+          command -v qemu-system-x86_64
+          qemu-system-x86_64 --version | head -n1

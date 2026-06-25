@@ -1,0 +1,11 @@
+Package: ciforge-agent
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: CloudImageForge Contributors <cloudimageforge@example.com>
+Depends: python3 (>= 3.10), liblocalfoo1
+Description: Demonstrates a host-only apt dependency
+ liblocalfoo1 is installed on the developer workstation but is not in
+ the Ubuntu Archive, so apt resolves on the host and fails on a clean
+ jammy/noble cloud image. See README "Staging fallback check".

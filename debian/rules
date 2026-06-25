@@ -1,0 +1,6 @@
+#!/usr/bin/make -f
+export PYBUILD_NAME=cloudimageforge
+export PYBUILD_TEST_ARGS=-q tests/unit
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild

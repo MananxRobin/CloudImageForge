@@ -1,0 +1,28 @@
+Source: cloudimageforge
+Section: python
+Priority: optional
+Maintainer: CloudImageForge Contributors <cloudimageforge@example.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-pytest
+Standards-Version: 4.7.0
+Homepage: https://github.com/canonical-community/cloudimageforge
+Vcs-Git: https://github.com/canonical-community/cloudimageforge.git
+Vcs-Browser: https://github.com/canonical-community/cloudimageforge
+Rules-Requires-Root: no
+
+Package: cloudimageforge
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
+Recommends: qemu-system-x86, qemu-utils, uidmap
+Suggests: sbuild, pbuilder, lxd | lxd-installer
+Description: Ubuntu 22.04/24.04 cloud image and deb packaging pipeline
+ CloudImageForge creates and manages Ubuntu jammy and noble cloud images,
+ renders apt sources, builds debs with dpkg-deb/sbuild/pbuilder, and
+ queries the Ubuntu Archive (Launchpad getPublishedSources) dataset.
+ .
+ Packages are published through a Launchpad-style staging archive. A
+ fallback check boots a clean image (LXD/QEMU, or a simulated guest in
+ CI) so an apt dependency that resolved on a dirty host cannot ship.

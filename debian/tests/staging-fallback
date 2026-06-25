@@ -1,0 +1,24 @@
+#!/bin/sh
+# autopkgtest: the clean-image apt edge case must block publish
+set -eu
+python3 -m pytest -q tests/unit/test_staging.py tests/unit/test_bootcheck.py tests/functional/test_pipeline.py
+
+echo "==> broken apt source must fail the boot check"
+if ciforge bootcheck --release jammy --backend simulate --apt-source tests/fixtures/broken-apt.list; then
+    echo "bootcheck should have rejected tests/fixtures/broken-apt.list" >&2
+    exit 1
+fi
+
+echo "==> host-only dependency must fail the staging fallback"
+staging=$(mktemp -d)
+ciforge stage add --control examples/host-only-agent/DEBIAN/control --staging "$staging"
+if ciforge stage check --release jammy --staging "$staging" --host-status tests/fixtures/host-dpkg-status; then
+    echo "stage check should have blocked liblocalfoo1" >&2
+    exit 1
+fi
+if ciforge publish --staging "$staging"; then
+    echo "publish must not succeed without a passing fallback check" >&2
+    exit 1
+fi
+
+echo "staging fallback check blocked the broken package as designed"

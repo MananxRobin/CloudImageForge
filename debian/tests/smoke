@@ -1,0 +1,11 @@
+#!/bin/sh
+# autopkgtest: unit tests plus apt source lint on jammy/noble defaults
+set -eu
+cd "$PWD"
+python3 -m pytest -q tests/unit
+ciforge apt render --release jammy >/tmp/jammy.list
+ciforge apt lint /tmp/jammy.list --release jammy
+ciforge apt render --release noble >/tmp/noble.sources
+ciforge apt lint /tmp/noble.sources --release noble
+ciforge archive query hello --release jammy
+ciforge archive query hello --release noble

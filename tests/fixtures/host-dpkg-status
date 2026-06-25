@@ -1,0 +1,17 @@
+Package: python3
+Status: install ok installed
+Architecture: amd64
+Version: 3.10.6-1~22.04.1
+Depends: python3-minimal (= 3.10.6-1~22.04.1), libc6 (>= 2.34)
+
+Package: libc6
+Status: install ok installed
+Essential: yes
+Architecture: amd64
+Version: 2.35-0ubuntu3.8
+
+Package: liblocalfoo1
+Status: install ok installed
+Architecture: amd64
+Version: 1.0-1local
+Description: Built on the developer laptop, never uploaded to the Archive

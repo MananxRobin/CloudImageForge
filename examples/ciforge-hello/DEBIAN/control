@@ -1,0 +1,10 @@
+Package: ciforge-hello
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: CloudImageForge Contributors <cloudimageforge@example.com>
+Depends: python3 (>= 3.10), libc6
+Description: Sample package that installs on Ubuntu 22.04 and 24.04
+ CloudImageForge uses this tree to exercise dpkg-deb builds and the
+ Launchpad-style staging fallback check against a clean cloud image.

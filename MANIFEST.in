@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include CONTRIBUTING.md
+include Makefile
+recursive-include src/cloudimageforge/data *.json
+recursive-include debian *
+recursive-include docs *
+recursive-include examples *
+recursive-include tests *
+recursive-include scripts *
