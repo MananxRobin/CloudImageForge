@@ -146,7 +146,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/sbuild
-          key: sbuild-noble-unshare-${{ runner.os }}
+          key: sbuild-noble-universe-${{ runner.os }}
       - name: Build ciforge-hello via sbuild
         run: bash scripts/ci-sbuild.sh
 

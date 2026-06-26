@@ -2,12 +2,16 @@
 # Pull an Ubuntu cloud image and boot it in QEMU with a NoCloud apt seed.
 set -eu
 
-timeout_s=900
 if [ -e /dev/kvm ]; then
-    echo "KVM available"
+    sudo chmod 666 /dev/kvm || true
+fi
+
+timeout_s=900
+if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+    echo "KVM usable"
     timeout_s=300
 else
-    echo "No KVM; using TCG (slow)"
+    echo "No usable KVM; using TCG"
 fi
 
 echo "==> pull jammy qemu cloud image"

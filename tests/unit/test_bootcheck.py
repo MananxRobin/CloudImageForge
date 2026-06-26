@@ -29,9 +29,11 @@ def test_lxd_and_qemu_commands_are_real_sysadmin_invocations():
     cmds = lxd_commands(get_release("jammy"), "ciforge-check")
     assert cmds[0] == ["lxc", "launch", "ubuntu:22.04", "ciforge-check"]
     assert ["lxc", "exec", "ciforge-check", "--", "apt-get", "update"] in cmds
+
     qemu = qemu_commands(Path("noble.qcow2"), Path("seed.img"), kvm=False)
     assert qemu[0] == "qemu-system-x86_64"
     assert "accel=tcg" in qemu
+    assert qemu[qemu.index("-cpu") + 1] == "max"
     assert "noble.qcow2" in " ".join(qemu)
 
 

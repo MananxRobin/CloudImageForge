@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import select
 import shutil
 import subprocess
@@ -49,6 +50,12 @@ def lxd_commands(release: UbuntuRelease, name: str) -> list[list[str]]:
     ]
 
 
+def kvm_usable() -> bool:
+    """True only when /dev/kvm exists *and* this user can open it."""
+    path = Path("/dev/kvm")
+    return path.exists() and os.access(path, os.R_OK | os.W_OK)
+
+
 def qemu_commands(
     image: Path,
     seed: Path,
@@ -56,7 +63,7 @@ def qemu_commands(
     memory_mb: int = 2048,
     kvm: bool | None = None,
 ) -> list[str]:
-    use_kvm = Path("/dev/kvm").exists() if kvm is None else kvm
+    use_kvm = kvm_usable() if kvm is None else kvm
     accel = "kvm" if use_kvm else "tcg"
     cpu = "host" if use_kvm else "max"
     return [
@@ -205,6 +212,32 @@ def _read_qemu_serial(proc: subprocess.Popen[str], timeout: int) -> tuple[str, s
     return joined, None
 
 
+def _stop_qemu(proc: subprocess.Popen[str]) -> None:
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+def _run_qemu_once(command: list[str], timeout: int) -> tuple[str, str | None]:
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except FileNotFoundError as exc:
+        raise BootCheckError("qemu-system-x86_64 is not installed.") from exc
+    try:
+        return _read_qemu_serial(proc, timeout)
+    finally:
+        _stop_qemu(proc)
+
+
 def run_qemu_bootcheck(
     release: UbuntuRelease,
     sources_text: str,
@@ -232,26 +265,11 @@ def run_qemu_bootcheck(
     )
     command = qemu_commands(overlay, seed)
     try:
-        proc = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-    except FileNotFoundError as exc:
-        raise BootCheckError("qemu-system-x86_64 is not installed.") from exc
-    marker = None
-    log = ""
-    try:
-        log, marker = _read_qemu_serial(proc, timeout)
+        log, marker = _run_qemu_once(command, timeout)
+        if marker is None and "failed to initialize kvm" in log:
+            command = qemu_commands(overlay, seed, kvm=False)
+            log, marker = _run_qemu_once(command, timeout)
     finally:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                proc.kill()
         if cleanup_work:
             shutil.rmtree(work, ignore_errors=True)
 

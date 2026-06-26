@@ -10,8 +10,11 @@ fi
 mkdir -p "$HOME/.cache/sbuild" dist
 chroot="$HOME/.cache/sbuild/noble-amd64.tar.zst"
 if [ ! -f "$chroot" ]; then
-    echo "==> mmdebstrap noble buildd chroot"
-    mmdebstrap --verbose --variant=buildd noble "$chroot"
+    echo "==> mmdebstrap noble buildd chroot (main+universe)"
+    mmdebstrap --verbose --variant=buildd \
+        --components=main,universe \
+        --include=ca-certificates,dumb-init,dose-distcheck \
+        noble "$chroot"
 fi
 
 ciforge package dsc examples/ciforge-hello-src --dest dist
@@ -20,7 +23,9 @@ dscname=$(basename "$(ls dist/*.dsc | head -n 1)")
 echo "==> sbuild --chroot-mode=unshare -d noble"
 (
     cd dist
-    sbuild --chroot-mode=unshare --dist=noble --no-run-lintian --nolog "$dscname"
+    sbuild --chroot-mode=unshare --dist=noble --no-run-lintian --nolog \
+        --extra-repository='deb http://archive.ubuntu.com/ubuntu noble universe' \
+        "$dscname"
 )
 
 ls -l dist/*.deb
