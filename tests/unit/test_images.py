@@ -1,7 +1,7 @@
 import hashlib
 from pathlib import Path
 
-from cloudimageforge.images import CloudImage, CloudImageCatalog, pull_image, sha256_file
+from cloudimageforge.images import CloudImage, CloudImageCatalog, backing_format, pull_image, sha256_file
 import json
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "simplestreams.json"
@@ -83,3 +83,15 @@ def test_pull_image_rejects_checksum_mismatch(tmp_path: Path):
 
     with pytest.raises(ArchiveAPIError, match="SHA-256"):
         pull_image(image, tmp_path, downloader=download)
+
+
+def test_backing_format_treats_ubuntu_img_as_qcow2(tmp_path: Path):
+    image = tmp_path / "ubuntu-22.04-server-cloudimg-amd64.img"
+    image.write_bytes(b"QFI\xfb" + b"\x00" * 32)
+    assert backing_format(image) == "qcow2"
+
+
+def test_backing_format_raw_img_without_qcow_magic(tmp_path: Path):
+    image = tmp_path / "disk.img"
+    image.write_bytes(b"not-a-qcow-image")
+    assert backing_format(image) == "raw"

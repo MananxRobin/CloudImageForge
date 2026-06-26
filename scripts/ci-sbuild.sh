@@ -23,9 +23,7 @@ dscname=$(basename "$(ls dist/*.dsc | head -n 1)")
 echo "==> sbuild --chroot-mode=unshare -d noble"
 (
     cd dist
-    sbuild --chroot-mode=unshare --dist=noble --no-run-lintian --nolog \
-        --extra-repository='deb http://archive.ubuntu.com/ubuntu noble universe' \
-        "$dscname"
+    sbuild --chroot-mode=unshare --dist=noble --no-run-lintian --nolog "$dscname"
 )
 
 ls -l dist/*.deb

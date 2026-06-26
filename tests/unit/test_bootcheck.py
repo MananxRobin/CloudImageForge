@@ -35,6 +35,17 @@ def test_lxd_and_qemu_commands_are_real_sysadmin_invocations():
     assert "accel=tcg" in qemu
     assert qemu[qemu.index("-cpu") + 1] == "max"
     assert "noble.qcow2" in " ".join(qemu)
+    assert "romfile=" in " ".join(qemu)
+
+    uefi = qemu_commands(
+        Path("noble.qcow2"),
+        Path("seed.img"),
+        kvm=False,
+        firmware=Path("/usr/share/OVMF/OVMF_CODE_4M.fd"),
+        firmware_vars=Path("OVMF_VARS.fd"),
+    )
+    assert "q35,accel=tcg" in uefi
+    assert "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd" in uefi
 
 
 def test_lxd_dry_run_does_not_require_hypervisor():

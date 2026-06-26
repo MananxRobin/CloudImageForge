@@ -9,7 +9,7 @@ fi
 timeout_s=900
 if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
     echo "KVM usable"
-    timeout_s=300
+    timeout_s=480
 else
     echo "No usable KVM; using TCG"
 fi

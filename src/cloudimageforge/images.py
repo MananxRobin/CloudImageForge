@@ -188,7 +188,32 @@ def pull_image(
     return dest
 
 
+QCOW2_MAGIC = b"QFI\xfb"
+
+
 def backing_format(path: Path) -> str:
+    """Detect the real disk format. Ubuntu cloud images are qcow2 even when named .img."""
+    if path.exists():
+        try:
+            with path.open("rb") as handle:
+                if handle.read(4) == QCOW2_MAGIC:
+                    return "qcow2"
+        except OSError:
+            pass
+    qemu_img = shutil.which("qemu-img")
+    if qemu_img and path.exists():
+        try:
+            result = subprocess.run(
+                [qemu_img, "info", "--output=json", str(path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            fmt = json.loads(result.stdout).get("format")
+            if fmt:
+                return str(fmt)
+        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError, TypeError):
+            pass
     suffix = path.suffix.lower()
     if suffix in {".qcow2", ".qcow"}:
         return "qcow2"

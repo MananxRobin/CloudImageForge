@@ -50,10 +50,30 @@ def lxd_commands(release: UbuntuRelease, name: str) -> list[list[str]]:
     ]
 
 
+OVMF_CODE_PATHS = (
+    Path("/usr/share/OVMF/OVMF_CODE_4M.fd"),
+    Path("/usr/share/OVMF/OVMF_CODE.fd"),
+    Path("/usr/share/ovmf/OVMF.fd"),
+    Path("/usr/share/qemu/OVMF.fd"),
+)
+OVMF_VARS_PATHS = (
+    Path("/usr/share/OVMF/OVMF_VARS_4M.fd"),
+    Path("/usr/share/OVMF/OVMF_VARS.fd"),
+)
+
+
 def kvm_usable() -> bool:
     """True only when /dev/kvm exists *and* this user can open it."""
     path = Path("/dev/kvm")
     return path.exists() and os.access(path, os.R_OK | os.W_OK)
+
+
+def find_ovmf() -> tuple[Path, Path | None] | None:
+    code = next((path for path in OVMF_CODE_PATHS if path.exists()), None)
+    if code is None:
+        return None
+    variables = next((path for path in OVMF_VARS_PATHS if path.exists()), None)
+    return code, variables
 
 
 def qemu_commands(
@@ -62,14 +82,27 @@ def qemu_commands(
     *,
     memory_mb: int = 2048,
     kvm: bool | None = None,
+    firmware: Path | None = None,
+    firmware_vars: Path | None = None,
 ) -> list[str]:
     use_kvm = kvm_usable() if kvm is None else kvm
     accel = "kvm" if use_kvm else "tcg"
     cpu = "host" if use_kvm else "max"
+    machine = f"q35,accel={accel}" if firmware else f"accel={accel}"
+    firmware_args: list[str] = []
+    if firmware and firmware_vars:
+        firmware_args = [
+            "-drive",
+            f"if=pflash,format=raw,readonly=on,file={firmware}",
+            "-drive",
+            f"if=pflash,format=raw,file={firmware_vars}",
+        ]
+    elif firmware:
+        firmware_args = ["-bios", str(firmware)]
     return [
         "qemu-system-x86_64",
         "-machine",
-        f"accel={accel}",
+        machine,
         "-cpu",
         cpu,
         "-smp",
@@ -78,8 +111,9 @@ def qemu_commands(
         str(memory_mb),
         "-nographic",
         "-no-reboot",
+        *firmware_args,
         "-nic",
-        "user,model=virtio-net-pci",
+        "user,model=virtio-net-pci,romfile=",
         "-drive",
         f"file={image},if=virtio,format=qcow2,discard=unmap",
         "-drive",
@@ -263,11 +297,23 @@ def run_qemu_bootcheck(
         cloud_init_user_data(release, sources_text),
         cloud_init_meta_data(f"ciforge-{release.series}"),
     )
-    command = qemu_commands(overlay, seed)
+    firmware = None
+    firmware_vars = None
+    ovmf = find_ovmf()
+    if ovmf is not None:
+        firmware, vars_src = ovmf
+        if vars_src is not None:
+            firmware_vars = work / "OVMF_VARS.fd"
+            shutil.copyfile(vars_src, firmware_vars)
+    command = qemu_commands(
+        overlay, seed, firmware=firmware, firmware_vars=firmware_vars
+    )
     try:
         log, marker = _run_qemu_once(command, timeout)
         if marker is None and "failed to initialize kvm" in log:
-            command = qemu_commands(overlay, seed, kvm=False)
+            command = qemu_commands(
+                overlay, seed, kvm=False, firmware=firmware, firmware_vars=firmware_vars
+            )
             log, marker = _run_qemu_once(command, timeout)
     finally:
         if cleanup_work:
