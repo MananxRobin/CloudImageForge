@@ -50,13 +50,17 @@ ciforge archive query hello --release jammy --live
 
 ## Hypervisor tests
 
-LXD and QEMU jobs are optional on a laptop. CI always runs the simulate
-backend (same apt and dependency checks) plus a dry-run of the real
-`lxc launch` / `qemu-system-x86_64` command lines. To run guests locally:
+CI boots real guests:
+
+- LXD: `lxc launch ubuntu:22.04` / `ubuntu:24.04`, injects apt sources, `apt-get update`
+- QEMU: `ciforge image pull` of the jammy cloud image, NoCloud seed, serial marker
+
+Locally:
 
 ```bash
 ciforge bootcheck --release jammy --backend lxd
-ciforge bootcheck --release noble --backend qemu --image /path/to/noble.qcow2
+ciforge image pull --release jammy --cloud qemu
+ciforge bootcheck --release jammy --backend qemu
 ```
 
 ## Code of conduct

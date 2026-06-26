@@ -13,8 +13,8 @@ from cloudimageforge.archive import UbuntuArchiveClient
 from cloudimageforge.bootcheck import bootcheck
 from cloudimageforge.dpkgstatus import load_dpkg_status
 from cloudimageforge.exceptions import CloudImageForgeError
-from cloudimageforge.images import CloudImageCatalog
-from cloudimageforge.packaging import build_package
+from cloudimageforge.images import CloudImageCatalog, pull_image
+from cloudimageforge.packaging import build_package, build_source_package
 from cloudimageforge.pipeline import run_pipeline
 from cloudimageforge.releases import get_release, parse_release_list
 from cloudimageforge.staging import StagingArchive
@@ -43,6 +43,15 @@ def cmd_image_latest(args: argparse.Namespace) -> int:
     catalog = CloudImageCatalog(products=_load_json(args.stream) if args.stream else None)
     image = catalog.latest(args.release, cloud=args.cloud, arch=args.arch)
     _print(json.dumps(image.__dict__, indent=2))
+    return 0
+
+
+def cmd_image_pull(args: argparse.Namespace) -> int:
+    catalog = CloudImageCatalog(products=_load_json(args.stream) if args.stream else None)
+    image = catalog.latest(args.release, cloud=args.cloud, arch=args.arch)
+    dest_dir = Path(args.dest) if args.dest else None
+    path = pull_image(image, dest_dir)
+    _print(f"pulled {image.release} {image.serial} {image.ftype} -> {path}")
     return 0
 
 
@@ -97,6 +106,12 @@ def cmd_package_build(args: argparse.Namespace) -> int:
     )
     _print(f"backend={result.backend} artifact={result.artifact}")
     _print("command: " + " ".join(result.command))
+    return 0
+
+
+def cmd_package_dsc(args: argparse.Namespace) -> int:
+    dsc = build_source_package(Path(args.path), Path(args.dest))
+    _print(f"dsc={dsc}")
     return 0
 
 
@@ -160,6 +175,8 @@ def cmd_bootcheck(args: argparse.Namespace) -> int:
         staging=staging,
         image=Path(args.image) if args.image else None,
         dry_run=args.dry_run,
+        timeout=args.timeout,
+        pull=not args.no_pull,
     )
     _print(f"backend={report.backend} release={report.release} ok={report.ok}")
     _print(report.log)
@@ -216,6 +233,13 @@ def build_parser() -> argparse.ArgumentParser:
     ilat.add_argument("--arch", default="amd64")
     ilat.add_argument("--stream")
     ilat.set_defaults(func=cmd_image_latest)
+    ipull = image_sub.add_parser("pull", help="Download a cloud image from cloud-images.ubuntu.com")
+    ipull.add_argument("--release", default="noble")
+    ipull.add_argument("--cloud", default="qemu")
+    ipull.add_argument("--arch", default="amd64")
+    ipull.add_argument("--dest", help="Cache directory (default: ~/.cache/cloudimageforge/images)")
+    ipull.add_argument("--stream")
+    ipull.set_defaults(func=cmd_image_pull)
 
     apt = sub.add_parser("apt", help="Configure and lint apt sources for cloud images")
     apt_sub = apt.add_subparsers(dest="apt_command", required=True)
@@ -249,6 +273,10 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--dsc")
     pb.add_argument("--dry-run", action="store_true")
     pb.set_defaults(func=cmd_package_build)
+    pd = pkg_sub.add_parser("dsc", help="Build a .dsc for sbuild/pbuilder")
+    pd.add_argument("path", help="Directory containing debian/control")
+    pd.add_argument("--dest", default="dist")
+    pd.set_defaults(func=cmd_package_dsc)
 
     val = sub.add_parser("validate", help="Check installability on jammy and noble")
     val.add_argument("--control", required=True)
@@ -280,6 +308,8 @@ def build_parser() -> argparse.ArgumentParser:
     boot.add_argument("--staging")
     boot.add_argument("--control")
     boot.add_argument("--image")
+    boot.add_argument("--timeout", type=int, default=None)
+    boot.add_argument("--no-pull", action="store_true")
     boot.add_argument("--dry-run", action="store_true")
     boot.set_defaults(func=cmd_bootcheck)
 

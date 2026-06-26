@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import select
 import shutil
+import subprocess
+import tempfile
+import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cloudimageforge.apt import AptSources, assert_sources_healthy, default_cloud_sources, lint_sources
-from cloudimageforge.exceptions import BootCheckError, BrokenAptSourceError
+from cloudimageforge.apt import AptSources, default_cloud_sources, guest_apt_path, lint_sources
+from cloudimageforge.exceptions import BootCheckError
+from cloudimageforge.images import CloudImageCatalog, create_overlay, pull_image
 from cloudimageforge.releases import UbuntuRelease, get_release
+from cloudimageforge.seed import MARKER_FAIL, MARKER_OK, cloud_init_meta_data, cloud_init_user_data, create_nocloud_seed
 from cloudimageforge.staging import FallbackReport, StagingArchive
 
 BACKENDS = ("simulate", "lxd", "qemu")
@@ -32,26 +39,44 @@ class BootCheckReport:
 
 def lxd_commands(release: UbuntuRelease, name: str) -> list[list[str]]:
     alias = f"ubuntu:{release.version}"
+    guest = guest_apt_path(release)
     return [
-        ["lxc", "launch", alias, name, "--ephemeral"],
+        ["lxc", "launch", alias, name],
+        ["lxc", "exec", name, "--", "cloud-init", "status", "--wait"],
+        ["lxc", "exec", name, "--", "tee", guest],
         ["lxc", "exec", name, "--", "apt-get", "update"],
-        ["lxc", "exec", name, "--", "apt-get", "install", "-y", "apt-utils"],
         ["lxc", "delete", "--force", name],
     ]
 
 
-def qemu_commands(image: Path, seed: Path) -> list[str]:
+def qemu_commands(
+    image: Path,
+    seed: Path,
+    *,
+    memory_mb: int = 2048,
+    kvm: bool | None = None,
+) -> list[str]:
+    use_kvm = Path("/dev/kvm").exists() if kvm is None else kvm
+    accel = "kvm" if use_kvm else "tcg"
+    cpu = "host" if use_kvm else "max"
     return [
         "qemu-system-x86_64",
-        "-nographic",
+        "-machine",
+        f"accel={accel}",
+        "-cpu",
+        cpu,
+        "-smp",
+        "2",
         "-m",
-        "2048",
+        str(memory_mb),
+        "-nographic",
+        "-no-reboot",
         "-nic",
         "user,model=virtio-net-pci",
         "-drive",
-        f"file={image},if=virtio,format=qcow2",
+        f"file={image},if=virtio,format=qcow2,discard=unmap",
         "-drive",
-        f"file={seed},if=virtio,format=raw",
+        f"file={seed},if=virtio,format=raw,readonly=on",
     ]
 
 
@@ -61,12 +86,7 @@ def simulate_boot(
     *,
     staging: StagingArchive | None = None,
 ) -> BootCheckReport:
-    """System-administration check used in CI and as the pre-release gate.
-
-    Walks the same path a clean LXD/QEMU guest would: parse apt sources,
-    reject broken mirrors/suites, then run the staging fallback check so
-    a host-only dependency cannot slip into a published image.
-    """
+    """Fast pre-flight used in unit tests and as a gate before a live boot."""
     rel = release if isinstance(release, UbuntuRelease) else get_release(release)
     text = sources_text if sources_text is not None else default_cloud_sources(rel).render()
     issues = lint_sources(text, rel)
@@ -91,6 +111,172 @@ def simulate_boot(
     )
 
 
+def _lxc(*args: str, check: bool = True, timeout: int = 180, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            ["lxc", *args],
+            check=check,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            input=input_text,
+        )
+    except FileNotFoundError as exc:
+        raise BootCheckError("lxc is not installed; install LXD or use --backend simulate.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise BootCheckError(f"lxc {' '.join(args)} timed out") from exc
+    except subprocess.CalledProcessError as exc:
+        raise BootCheckError(
+            f"lxc {' '.join(args)} failed:\n{exc.stderr or exc.stdout}"
+        ) from exc
+
+
+def run_lxd_bootcheck(
+    release: UbuntuRelease,
+    sources_text: str,
+    *,
+    name: str,
+    timeout: int = 180,
+) -> BootCheckReport:
+    """Launch ubuntu:{version}, inject apt sources, run apt-get update."""
+    alias = f"ubuntu:{release.version}"
+    guest = guest_apt_path(release)
+    log_parts: list[str] = []
+    command = ["lxc", "launch", alias, name]
+    subprocess.run(["lxc", "delete", "--force", name], check=False, capture_output=True, text=True)
+    try:
+        launched = _lxc("launch", alias, name, timeout=timeout)
+        log_parts.append(launched.stdout)
+        waited = _lxc("exec", name, "--", "cloud-init", "status", "--wait", timeout=timeout)
+        log_parts.append(waited.stdout)
+        _lxc("exec", name, "--", "tee", guest, timeout=timeout, input_text=sources_text)
+        if release.apt_format == "deb822":
+            _lxc("exec", name, "--", "sh", "-c", "printf '' > /etc/apt/sources.list", timeout=timeout)
+        update = subprocess.run(
+            ["lxc", "exec", name, "--", "apt-get", "update"],
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+        log_parts.append(update.stdout or "")
+        log_parts.append(update.stderr or "")
+        ok = update.returncode == 0
+        errors = [] if ok else [f"apt-get update failed in LXD guest {name} (exit {update.returncode})"]
+        return BootCheckReport(
+            backend="lxd",
+            release=release.series,
+            ok=ok,
+            apt_errors=errors,
+            command=command,
+            log="\n".join(part for part in log_parts if part),
+        )
+    finally:
+        subprocess.run(["lxc", "delete", "--force", name], check=False, capture_output=True, text=True)
+
+
+def _read_qemu_serial(proc: subprocess.Popen[str], timeout: int) -> tuple[str, str | None]:
+    output: list[str] = []
+    deadline = time.time() + timeout
+    stdout = proc.stdout
+    if stdout is None:
+        raise BootCheckError("QEMU produced no serial console.")
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            remainder = stdout.read() or ""
+            output.append(remainder)
+            break
+        ready, _, _ = select.select([stdout], [], [], 1.0)
+        if not ready:
+            continue
+        line = stdout.readline()
+        if not line:
+            continue
+        output.append(line)
+        if MARKER_OK in line:
+            return "".join(output), MARKER_OK
+        if MARKER_FAIL in line:
+            return "".join(output), MARKER_FAIL
+    joined = "".join(output)
+    if MARKER_OK in joined:
+        return joined, MARKER_OK
+    if MARKER_FAIL in joined:
+        return joined, MARKER_FAIL
+    return joined, None
+
+
+def run_qemu_bootcheck(
+    release: UbuntuRelease,
+    sources_text: str,
+    image: Path,
+    *,
+    timeout: int = 600,
+    work: Path | None = None,
+) -> BootCheckReport:
+    """Boot a pulled Ubuntu cloud image with a NoCloud seed and watch serial."""
+    if shutil.which("qemu-system-x86_64") is None:
+        raise BootCheckError(
+            "qemu-system-x86_64 is not installed; install qemu-system-x86 or use --backend simulate."
+        )
+    if not image.exists():
+        raise BootCheckError(f"Cloud image not found: {image}")
+
+    cleanup_work = work is None
+    work = Path(work) if work else Path(tempfile.mkdtemp(prefix="ciforge-qemu-"))
+    overlay = work / "overlay.qcow2"
+    create_overlay(image, overlay)
+    seed = create_nocloud_seed(
+        work,
+        cloud_init_user_data(release, sources_text),
+        cloud_init_meta_data(f"ciforge-{release.series}"),
+    )
+    command = qemu_commands(overlay, seed)
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+    except FileNotFoundError as exc:
+        raise BootCheckError("qemu-system-x86_64 is not installed.") from exc
+    marker = None
+    log = ""
+    try:
+        log, marker = _read_qemu_serial(proc, timeout)
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        if cleanup_work:
+            shutil.rmtree(work, ignore_errors=True)
+
+    if marker == MARKER_OK:
+        return BootCheckReport(
+            backend="qemu",
+            release=release.series,
+            ok=True,
+            command=command,
+            log=log,
+        )
+    if marker == MARKER_FAIL:
+        return BootCheckReport(
+            backend="qemu",
+            release=release.series,
+            ok=False,
+            apt_errors=["apt-get update failed in the QEMU guest"],
+            command=command,
+            log=log,
+        )
+    raise BootCheckError(
+        f"QEMU guest did not report apt-get update within {timeout}s. Serial log:\n{log[-4000:]}"
+    )
+
+
 def bootcheck(
     release: UbuntuRelease | str,
     *,
@@ -98,8 +284,10 @@ def bootcheck(
     sources: AptSources | str | None = None,
     staging: StagingArchive | None = None,
     image: Path | None = None,
-    name: str = "ciforge-check",
+    name: str | None = None,
     dry_run: bool = False,
+    timeout: int | None = None,
+    pull: bool = True,
 ) -> BootCheckReport:
     if backend not in BACKENDS:
         raise BootCheckError(f"Unknown boot backend {backend!r}. Choose {BACKENDS}.")
@@ -111,25 +299,13 @@ def bootcheck(
     else:
         sources_text = default_cloud_sources(rel).render()
 
-    try:
-        assert_sources_healthy(sources_text, rel)
-    except BrokenAptSourceError as exc:
-        if backend == "simulate" or dry_run:
-            return BootCheckReport(
-                backend=backend,
-                release=rel.series,
-                ok=False,
-                apt_errors=[str(exc)],
-                command=["ciforge", "bootcheck", "--backend", backend],
-                log=str(exc),
-            )
-        raise
+    instance = name or f"ciforge-{rel.series}-{uuid.uuid4().hex[:8]}"
 
     if backend == "simulate" or dry_run:
         report = simulate_boot(rel, sources_text, staging=staging)
         if dry_run and backend != "simulate":
             if backend == "lxd":
-                cmds = lxd_commands(rel, name)
+                cmds = lxd_commands(rel, instance)
                 report.command = cmds[0]
                 report.backend = "lxd"
                 report.log = "dry-run: " + " && ".join(" ".join(c) for c in cmds)
@@ -140,35 +316,12 @@ def bootcheck(
         return report
 
     if backend == "lxd":
-        lxc = shutil.which("lxc")
-        if not lxc:
-            raise BootCheckError("lxc is not installed; use --backend simulate or install LXD.")
-        commands = lxd_commands(rel, name)
-        log_parts: list[str] = []
-        for command in commands:
-            try:
-                proc = __import__("subprocess").run(
-                    command, check=True, text=True, capture_output=True
-                )
-            except Exception as exc:  # pragma: no cover - live hypervisor
-                raise BootCheckError(f"LXD boot check failed: {exc}") from exc
-            log_parts.append(proc.stdout)
-        report = simulate_boot(rel, sources_text, staging=staging)
-        report.backend = "lxd"
-        report.command = commands[0]
-        report.log = "\n".join(log_parts)
-        return report
+        return run_lxd_bootcheck(rel, sources_text, name=instance, timeout=timeout or 180)
 
-    qemu = shutil.which("qemu-system-x86_64")
-    if not qemu:
-        raise BootCheckError(
-            "qemu-system-x86_64 is not installed; use --backend simulate or install qemu-system-x86."
-        )
-    if image is None or not image.exists():
-        raise BootCheckError("QEMU boot check requires --image pointing at a cloud qcow2.")
-    command = qemu_commands(image, Path("seed.img"))
-    report = simulate_boot(rel, sources_text, staging=staging)
-    report.backend = "qemu"
-    report.command = command
-    report.log = "qemu guest reached apt-get update path"
-    return report
+    disk = image
+    if disk is None and pull:
+        catalog = CloudImageCatalog()
+        disk = pull_image(catalog.latest(rel, cloud="qemu"))
+    if disk is None:
+        raise BootCheckError("QEMU boot check requires --image or a successful image pull.")
+    return run_qemu_bootcheck(rel, sources_text, Path(disk), timeout=timeout or 600)

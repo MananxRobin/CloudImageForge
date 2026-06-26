@@ -52,7 +52,9 @@ _BY_KEY: dict[str, UbuntuRelease] = {
 SUPPORTED_RELEASES = (JAMMY, NOBLE)
 
 
-def get_release(name: str) -> UbuntuRelease:
+def get_release(name: str | UbuntuRelease) -> UbuntuRelease:
+    if isinstance(name, UbuntuRelease):
+        return name
     key = name.strip().lower()
     try:
         return _BY_KEY[key]

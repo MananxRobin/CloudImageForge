@@ -60,8 +60,9 @@ and run `autopkgtest` via `debian/tests/`.
 ## Pipeline
 
 ```bash
-# Catalog Ubuntu cloud images (SimpleStreams on cloud-images.ubuntu.com)
+# Catalog and pull Ubuntu cloud images (SimpleStreams)
 ciforge image list --release jammy --cloud qemu
+ciforge image pull --release jammy --cloud qemu
 ciforge image list --release noble --cloud lxd
 
 # Apt sources as a clean cloud image would see them
@@ -75,22 +76,23 @@ ciforge archive query hello --release noble --live
 
 # Build
 ciforge package build examples/ciforge-hello --backend dpkg-deb
-ciforge package build . --backend sbuild --release jammy --dsc foo.dsc --dry-run
-ciforge package build . --backend pbuilder --release noble --dsc foo.dsc --dry-run
+ciforge package dsc examples/ciforge-hello-src --dest dist
+ciforge package build examples/ciforge-hello-src --backend sbuild --release noble
+ciforge package build examples/ciforge-hello-src --backend pbuilder --release noble --dry-run
 
 # Interoperability across 22.04 and 24.04
 ciforge validate --control examples/ciforge-hello/DEBIAN/control --releases jammy,noble
 
 # Stage, fallback-check, boot, publish
 ciforge pipeline examples/ciforge-hello --releases jammy,noble
-ciforge bootcheck --release jammy --backend lxd --dry-run
-ciforge bootcheck --release noble --backend qemu --dry-run
+ciforge bootcheck --release jammy --backend lxd
+ciforge bootcheck --release jammy --backend qemu
+ciforge bootcheck --release jammy --backend lxd --apt-source tests/fixtures/broken-apt.list
 ```
 
-`sbuild` and `pbuilder` build against chroots populated from the Ubuntu
-Archive for the target series. `dpkg-deb` is the local binary backend (and
-the one CI uses). If `dpkg-deb` is not installed, CloudImageForge writes a
-`.deb` with the same `ar` + `control.tar.gz` + `data.tar.gz` layout.
+`sbuild --chroot-mode=unshare` and `pbuilder` build against chroots populated from the Ubuntu Archive. `dpkg-deb` is the local binary backend. If `dpkg-deb` is not installed, CloudImageForge writes a `.deb` with the same `ar` + `control.tar.gz` + `data.tar.gz` layout.
+
+Live boot checks pull a jammy/noble image, inject apt sources (cloud-init NoCloud for QEMU, `lxc exec tee` for LXD), and run `apt-get update` in the guest. A typo'd suite such as `jamy` fails inside that guest before release.
 
 ## Tests and CI
 
@@ -99,11 +101,17 @@ the one CI uses). If `dpkg-deb` is not installed, CloudImageForge writes a
 | unit | `pytest tests/unit` on Ubuntu 22.04 / Python 3.10 and 24.04 / 3.12 |
 | functional | end-to-end build → stage → bootcheck → publish |
 | autopkgtest | `debian/tests/smoke` and `debian/tests/staging-fallback` |
-| sysadmin-check | `scripts/sysadmin-check.sh`: broken apt source, host-only dep, LXD/QEMU dry-run |
+| sysadmin-check | `scripts/sysadmin-check.sh`: resolver fallback + apt lint |
+| boot-lxd | real `lxc launch ubuntu:22.04` / `24.04`, inject sources, `apt-get update` |
+| boot-qemu | `ciforge image pull` + QEMU NoCloud seed + serial `CIFORGE_BOOTCHECK` |
+| sbuild | `sbuild --chroot-mode=unshare -d noble` on `examples/ciforge-hello-src` |
+| pbuilder | `pbuilder create/build` noble chroot from the Ubuntu Archive |
 
 ```bash
-python3 -m pytest
+python3 -m pytest tests/unit tests/functional
 bash scripts/sysadmin-check.sh
+bash scripts/ci-boot-lxd.sh    # requires LXD
+bash scripts/ci-boot-qemu.sh   # requires qemu-system-x86
 ```
 
 ## Community

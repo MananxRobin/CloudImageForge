@@ -57,7 +57,7 @@ jobs:
           python -m pip install -e ".[dev]"
           sudo apt-get update
           sudo apt-get install -y autopkgtest
-          autopkgtest --version
+          command -v autopkgtest
       - name: Run Debian autopkgtest scripts
         run: |
           chmod +x debian/tests/smoke debian/tests/staging-fallback
@@ -85,3 +85,89 @@ jobs:
           ciforge bootcheck --release noble --backend qemu --dry-run
           command -v qemu-system-x86_64
           qemu-system-x86_64 --version | head -n1
+
+  boot-lxd:
+    name: boot LXD (apt-get update)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v1
+        with:
+          channel: 5.21/stable
+      - name: Boot jammy and noble, catch broken apt
+        run: bash scripts/ci-boot-lxd.sh
+      - name: Live LXD tests
+        run: python -m pytest tests/live -m live
+
+  boot-qemu:
+    name: boot QEMU (cloud image + apt)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install QEMU and seed tools
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils genisoimage cloud-image-utils
+      - name: Cache Ubuntu cloud images
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cloudimageforge/images
+          key: jammy-qemu-cloudimg-${{ runner.os }}
+      - name: Pull image, boot, catch broken apt
+        run: bash scripts/ci-boot-qemu.sh
+
+  sbuild:
+    name: sbuild unshare (noble)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install sbuild
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update
+          sudo apt-get install -y sbuild mmdebstrap uidmap dpkg-dev debhelper
+      - name: Cache sbuild chroots
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sbuild
+          key: sbuild-noble-unshare-${{ runner.os }}
+      - name: Build ciforge-hello via sbuild
+        run: bash scripts/ci-sbuild.sh
+
+  pbuilder:
+    name: pbuilder (noble)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pbuilder
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update
+          sudo apt-get install -y pbuilder debootstrap dpkg-dev debhelper eatmydata
+      - name: Cache pbuilder base
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cloudimageforge/pbuilder
+          key: pbuilder-noble-${{ runner.os }}
+      - name: Build ciforge-hello via pbuilder
+        run: bash scripts/ci-pbuilder.sh

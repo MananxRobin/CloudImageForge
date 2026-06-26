@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
+import subprocess
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from cloudimageforge.archive import USER_AGENT
-from cloudimageforge.exceptions import ArchiveAPIError, UnsupportedReleaseError
+from cloudimageforge.exceptions import ArchiveAPIError, BootCheckError, UnsupportedReleaseError
 from cloudimageforge.releases import SUPPORTED_CLOUDS, UbuntuRelease, get_release
 
 STREAM_INDEX = "https://cloud-images.ubuntu.com/releases/streams/v1/index.json"
@@ -26,6 +30,9 @@ CLOUD_FTYPES = {
     "gcp": ("disk1.img", "tar.gz"),
     "gce": ("disk1.img", "tar.gz"),
 }
+
+DEFAULT_IMAGE_CACHE = Path.home() / ".cache" / "cloudimageforge" / "images"
+Downloader = Callable[[str, Path], None]
 
 
 @dataclass(frozen=True)
@@ -132,3 +139,83 @@ class CloudImageCatalog:
                 f"No {cloud} cloud image found for Ubuntu {rel.series} {rel.version} ({arch})."
             )
         return images[0]
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _download(url: str, dest: Path, timeout: float = 600.0) -> None:
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response, tmp.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+        tmp.replace(dest)
+    except OSError as exc:
+        tmp.unlink(missing_ok=True)
+        raise ArchiveAPIError(f"Failed to download {url}: {exc}") from exc
+
+
+def pull_image(
+    image: CloudImage,
+    dest_dir: Path | None = None,
+    *,
+    downloader: Downloader | None = None,
+) -> Path:
+    """Download a cloud image into the local cache and verify its SHA-256."""
+    dest_dir = Path(dest_dir) if dest_dir else DEFAULT_IMAGE_CACHE
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / Path(image.path).name
+    fetch = downloader or (lambda url, path: _download(url, path))
+    if dest.exists() and image.sha256 and sha256_file(dest) == image.sha256:
+        return dest
+    fetch(image.url, dest)
+    if image.sha256 and sha256_file(dest) != image.sha256:
+        dest.unlink(missing_ok=True)
+        raise ArchiveAPIError(
+            f"SHA-256 mismatch for {dest.name}: expected {image.sha256}"
+        )
+    return dest
+
+
+def backing_format(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".qcow2", ".qcow"}:
+        return "qcow2"
+    return "raw"
+
+
+def create_overlay(backing: Path, overlay: Path) -> Path:
+    """Disposable qcow2 overlay so boot checks do not dirty the pulled image."""
+    qemu_img = shutil.which("qemu-img")
+    if not qemu_img:
+        raise BootCheckError("qemu-img is required (install qemu-utils).")
+    overlay.parent.mkdir(parents=True, exist_ok=True)
+    if overlay.exists():
+        overlay.unlink()
+    command = [
+        qemu_img,
+        "create",
+        "-f",
+        "qcow2",
+        "-F",
+        backing_format(backing),
+        "-b",
+        str(backing.resolve()),
+        str(overlay),
+    ]
+    try:
+        subprocess.run(command, check=True, text=True, capture_output=True)
+    except subprocess.CalledProcessError as exc:
+        raise BootCheckError(f"qemu-img overlay failed: {exc.stderr or exc.stdout}") from exc
+    return overlay

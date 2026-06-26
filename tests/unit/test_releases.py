@@ -20,3 +20,8 @@ def test_unsupported_release_is_rejected():
 def test_parse_release_list():
     releases = parse_release_list("jammy, noble")
     assert [item.series for item in releases] == ["jammy", "noble"]
+
+
+def test_get_release_accepts_ubuntu_release_instance():
+    assert get_release(JAMMY) is JAMMY
+    assert get_release(NOBLE) is NOBLE

@@ -1,0 +1,5 @@
+ciforge-hello (0.1.0) noble; urgency=medium
+
+  * Native source package for sbuild/pbuilder CI.
+
+ -- CloudImageForge Contributors <cloudimageforge@example.com>  Wed, 25 Jun 2026 16:18:07 -0400

@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "ciforge-hello: Ubuntu 22.04/24.04 cloud image helper"

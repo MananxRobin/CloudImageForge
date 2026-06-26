@@ -4,7 +4,8 @@
                   Ubuntu Archive (Launchpad API + snapshot)
                                     |
                                     v
-  SimpleStreams  -->  image catalog (jammy/noble, qemu/lxd/aws/azure/gcp)
+SimpleStreams  -->  image pull / overlay -->  QEMU NoCloud seed
+  ubuntu:22.04/24.04 LXD  ------------------>  apt-get update in guest
                                     |
   debian/control -->  dpkg-deb / sbuild / pbuilder
                                     |
@@ -31,7 +32,8 @@
 | `releases` | jammy (22.04) and noble (24.04) only |
 | `apt` | render/lint `sources.list` and DEB822 |
 | `archive` | Launchpad `getPublishedSources` + bundled dataset |
-| `images` | SimpleStreams product files |
+| `images` | SimpleStreams catalog, image pull, qcow2 overlay |
+| `seed` | cloud-init NoCloud user-data that runs `apt-get update` |
 | `depends` | Debian Depends parser and solver |
 | `packaging` | `dpkg-deb`, `sbuild`, `pbuilder` |
 | `staging` | Launchpad-style pocket + fallback check |

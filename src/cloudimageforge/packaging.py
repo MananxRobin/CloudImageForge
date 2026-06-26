@@ -140,27 +140,64 @@ def build_dpkg_deb(package_dir: Path, dest: Path) -> BuildResult:
     return BuildResult("dpkg-deb", artifact, command, "built with built-in dpkg-deb writer")
 
 
-def sbuild_command(dsc: Path, release: UbuntuRelease) -> list[str]:
-    return [
-        "sbuild",
-        "-d",
-        release.series,
-        "--no-run-lintian",
-        "--no-apt-update",
-        str(dsc),
-    ]
+def sbuild_command(
+    dsc: Path,
+    release: UbuntuRelease,
+    *,
+    chroot_mode: str | None = "unshare",
+) -> list[str]:
+    command = ["sbuild", "-d", release.series, "--no-run-lintian"]
+    if chroot_mode:
+        command.extend(["--chroot-mode", chroot_mode])
+    command.append(str(Path(dsc).resolve()))
+    return command
 
 
-def pbuilder_command(dsc: Path, release: UbuntuRelease) -> list[str]:
+def pbuilder_command(
+    dsc: Path,
+    release: UbuntuRelease,
+    *,
+    basetgz: Path | None = None,
+) -> list[str]:
+    tarball = str(basetgz or Path(f"/var/cache/pbuilder/{release.series}-base.tgz"))
     return [
         "pbuilder",
         "build",
         "--distribution",
         release.series,
         "--basetgz",
-        f"/var/cache/pbuilder/{release.series}-base.tgz",
-        str(dsc),
+        tarball,
+        str(Path(dsc).resolve()),
     ]
+
+
+def pbuilder_create_command(
+    release: UbuntuRelease,
+    *,
+    basetgz: Path | None = None,
+) -> list[str]:
+    tarball = str(basetgz or Path(f"/var/cache/pbuilder/{release.series}-base.tgz"))
+    return ["pbuilder", "create", "--distribution", release.series, "--basetgz", tarball]
+
+
+def build_source_package(source_dir: Path, dest: Path) -> Path:
+    """Build a .dsc with dpkg-buildpackage -S for sbuild/pbuilder."""
+    source_dir = source_dir.resolve()
+    if not (source_dir / "debian" / "control").is_file():
+        raise PackageBuildError(f"No debian/control in {source_dir} (need a source package, not DEBIAN/).")
+    dest.mkdir(parents=True, exist_ok=True)
+    if not shutil.which("dpkg-buildpackage"):
+        raise PackageBuildError("dpkg-buildpackage is not installed (apt install dpkg-dev).")
+    _run(["dpkg-buildpackage", "-S", "-us", "-uc", "-d"], cwd=source_dir)
+    dscs = sorted(source_dir.parent.glob("*.dsc"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not dscs:
+        raise PackageBuildError("dpkg-buildpackage -S produced no .dsc.")
+    dsc = dscs[0]
+    name = dsc.name.split("_", 1)[0]
+    copied = dest / dsc.name
+    for extra in source_dir.parent.glob(f"{name}_*"):
+        shutil.copy2(extra, dest / extra.name)
+    return copied
 
 
 def build_package(
@@ -171,23 +208,36 @@ def build_package(
     release: UbuntuRelease | str = "noble",
     dsc: Path | None = None,
     dry_run: bool = False,
+    chroot_mode: str | None = "unshare",
 ) -> BuildResult:
     if backend not in BACKENDS:
         raise PackageBuildError(f"Unknown packaging backend {backend!r}. Choose {BACKENDS}.")
     rel = release if isinstance(release, UbuntuRelease) else get_release(release)
+    package_dir = Path(package_dir)
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
     if backend == "dpkg-deb":
         if dry_run:
             return BuildResult("dpkg-deb", dest, ["dpkg-deb", "-b", str(package_dir), str(dest)])
         return build_dpkg_deb(package_dir, dest)
     if dsc is None:
-        raise PackageBuildError(f"{backend} requires a .dsc (pass --dsc).")
-    command = sbuild_command(dsc, rel) if backend == "sbuild" else pbuilder_command(dsc, rel)
+        if (package_dir / "debian" / "control").is_file():
+            if dry_run:
+                dsc = dest / "pending.dsc"
+            else:
+                dsc = build_source_package(package_dir, dest)
+        else:
+            raise PackageBuildError(f"{backend} requires a .dsc or a debian/ source tree (pass --dsc).")
+    command = (
+        sbuild_command(dsc, rel, chroot_mode=chroot_mode)
+        if backend == "sbuild"
+        else pbuilder_command(dsc, rel)
+    )
     if dry_run:
         return BuildResult(backend, dest, command, "dry-run")
-    proc = _run(command)
+    proc = _run(command, cwd=dest)
     debs = sorted(dest.glob("*.deb"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not debs:
-        # sbuild writes to the current directory by default
         debs = sorted(Path.cwd().glob("*.deb"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not debs:
         raise PackageBuildError(f"{backend} produced no .deb artifacts.")

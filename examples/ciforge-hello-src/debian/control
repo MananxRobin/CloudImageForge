@@ -1,0 +1,13 @@
+Source: ciforge-hello
+Section: utils
+Priority: optional
+Maintainer: CloudImageForge Contributors <cloudimageforge@example.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: ciforge-hello
+Architecture: all
+Depends: ${misc:Depends}
+Description: Tiny package used to exercise sbuild and pbuilder
+ Built from the Ubuntu Archive chroots for jammy and noble.

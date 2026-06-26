@@ -10,6 +10,14 @@ from cloudimageforge.releases import UbuntuRelease, get_release
 
 VALID_COMPONENTS = ("main", "restricted", "universe", "multiverse")
 VALID_POCKETS = ("release", "updates", "security", "proposed", "backports")
+JAMMY_SOURCES_PATH = "/etc/apt/sources.list"
+NOBLE_SOURCES_PATH = "/etc/apt/sources.list.d/ubuntu.sources"
+
+
+def guest_apt_path(release: UbuntuRelease | str) -> str:
+    """Where a clean cloud image stores its apt configuration."""
+    rel = release if isinstance(release, UbuntuRelease) else get_release(release)
+    return NOBLE_SOURCES_PATH if rel.apt_format == "deb822" else JAMMY_SOURCES_PATH
 _LIST_LINE = re.compile(
     r"^(?P<disabled>#\s*)?(?P<type>deb-src|deb)\s+(?:\[(?P<options>[^\]]+)\]\s+)?"
     r"(?P<uri>\S+)\s+(?P<suite>\S+)(?:\s+(?P<components>.+))?$"

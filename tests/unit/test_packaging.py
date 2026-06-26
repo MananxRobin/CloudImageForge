@@ -47,7 +47,24 @@ def test_sbuild_and_pbuilder_commands_target_ubuntu_series():
     dsc = Path("ciforge-hello_0.1.0.dsc")
     sbuild = sbuild_command(dsc, get_release("jammy"))
     assert sbuild[:3] == ["sbuild", "-d", "jammy"]
-    from cloudimageforge.packaging import pbuilder_command
+    assert "--chroot-mode" in sbuild
+    assert "unshare" in sbuild
+    from cloudimageforge.packaging import pbuilder_command, pbuilder_create_command
+
     pbuilder = pbuilder_command(dsc, get_release("noble"))
     assert pbuilder[0] == "pbuilder"
     assert "noble" in pbuilder
+    create = pbuilder_create_command(get_release("jammy"))
+    assert create[:2] == ["pbuilder", "create"]
+    assert "jammy" in create
+
+
+def test_sbuild_dry_run_from_debian_source_tree(tmp_path: Path):
+    src = tmp_path / "hello"
+    (src / "debian").mkdir(parents=True)
+    (src / "debian" / "control").write_text("Source: hello\n", encoding="utf-8")
+    result = build_package(src, tmp_path / "dist", backend="sbuild", release="noble", dry_run=True)
+    assert result.backend == "sbuild"
+    assert result.command[0] == "sbuild"
+    assert "-d" in result.command
+    assert "noble" in result.command
