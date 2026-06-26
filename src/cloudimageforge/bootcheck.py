@@ -192,9 +192,16 @@ def run_lxd_bootcheck(
         log_parts.append(launched.stdout)
         waited = _lxc("exec", name, "--", "cloud-init", "status", "--wait", timeout=timeout)
         log_parts.append(waited.stdout)
+        _lxc(
+            "exec",
+            name,
+            "--",
+            "sh",
+            "-c",
+            "find /etc/apt/sources.list.d -type f -delete; printf '' > /etc/apt/sources.list",
+            timeout=timeout,
+        )
         _lxc("exec", name, "--", "tee", guest, timeout=timeout, input_text=sources_text)
-        if release.apt_format == "deb822":
-            _lxc("exec", name, "--", "sh", "-c", "printf '' > /etc/apt/sources.list", timeout=timeout)
         update = subprocess.run(
             ["lxc", "exec", name, "--", "apt-get", "update"],
             check=False,

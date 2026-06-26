@@ -19,13 +19,6 @@ def cloud_init_user_data(release: UbuntuRelease | str, sources_text: str) -> str
     rel = release if isinstance(release, UbuntuRelease) else get_release(release)
     path = guest_apt_path(rel)
     body = "\n".join(f"      {line}" if line else "      " for line in sources_text.splitlines())
-    extra = ""
-    if rel.apt_format == "deb822":
-        extra = """
-  - path: /etc/apt/sources.list
-    permissions: '0644'
-    content: ''
-"""
     return f"""#cloud-config
 hostname: ciforge-check
 manage_etc_hosts: true
@@ -36,14 +29,19 @@ growpart:
   mode: auto
   devices: ["/"]
 resize_rootfs: true
+apt:
+  preserve_sources_list: true
 write_files:
-  - path: {path}
+  - path: /etc/ciforge/apt-sources
     permissions: '0644'
     content: |
 {body}
-{extra}
 runcmd:
   - |
+    mkdir -p /etc/apt/sources.list.d
+    find /etc/apt/sources.list.d -type f -delete
+    printf '' > /etc/apt/sources.list
+    install -D -m 0644 /etc/ciforge/apt-sources {path}
     if apt-get update; then
       echo {MARKER_OK}
     else
