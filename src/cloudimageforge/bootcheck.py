@@ -112,8 +112,10 @@ def qemu_commands(
         "-nographic",
         "-no-reboot",
         *firmware_args,
-        "-nic",
-        "user,model=virtio-net-pci,romfile=",
+        "-netdev",
+        "user,id=net0",
+        "-device",
+        "virtio-net-pci,netdev=net0",
         "-drive",
         f"file={image},if=virtio,format=qcow2,discard=unmap",
         "-drive",
@@ -336,6 +338,8 @@ def run_qemu_bootcheck(
             command=command,
             log=log,
         )
+    if "qemu-system-x86_64:" in log or "Invalid parameter" in log:
+        raise BootCheckError(f"QEMU failed to start. Serial log:\n{log[-4000:]}")
     raise BootCheckError(
         f"QEMU guest did not report apt-get update within {timeout}s. Serial log:\n{log[-4000:]}"
     )

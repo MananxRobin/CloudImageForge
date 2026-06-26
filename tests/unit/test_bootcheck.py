@@ -35,7 +35,8 @@ def test_lxd_and_qemu_commands_are_real_sysadmin_invocations():
     assert "accel=tcg" in qemu
     assert qemu[qemu.index("-cpu") + 1] == "max"
     assert "noble.qcow2" in " ".join(qemu)
-    assert "romfile=" in " ".join(qemu)
+    assert "-netdev" in qemu
+    assert "virtio-net-pci,netdev=net0" in qemu
 
     uefi = qemu_commands(
         Path("noble.qcow2"),
