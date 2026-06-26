@@ -1,7 +1,7 @@
 import hashlib
 from pathlib import Path
 
-from cloudimageforge.images import CloudImage, CloudImageCatalog, backing_format, pull_image, sha256_file
+from cloudimageforge.images import CloudImage, CloudImageCatalog, backing_format, create_overlay, pull_image, sha256_file
 import json
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "simplestreams.json"
@@ -95,3 +95,24 @@ def test_backing_format_raw_img_without_qcow_magic(tmp_path: Path):
     image = tmp_path / "disk.img"
     image.write_bytes(b"not-a-qcow-image")
     assert backing_format(image) == "raw"
+
+
+def test_create_overlay_resizes_virtual_disk(monkeypatch, tmp_path: Path):
+    import subprocess
+
+    backing = tmp_path / "ubuntu-22.04-server-cloudimg-amd64.img"
+    backing.write_bytes(b"QFI\xfb" + b"\x00" * 32)
+    overlay = tmp_path / "overlay.qcow2"
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr("cloudimageforge.images.shutil.which", lambda name: "/usr/bin/qemu-img")
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("cloudimageforge.images.subprocess.run", fake_run)
+    create_overlay(backing, overlay)
+    assert calls[0][:3] == ["/usr/bin/qemu-img", "create", "-f"]
+    assert calls[0][-1] == str(overlay)
+    assert calls[1] == ["/usr/bin/qemu-img", "resize", str(overlay), "+8G"]

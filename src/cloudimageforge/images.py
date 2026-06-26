@@ -220,15 +220,19 @@ def backing_format(path: Path) -> str:
     return "raw"
 
 
-def create_overlay(backing: Path, overlay: Path) -> Path:
-    """Disposable qcow2 overlay so boot checks do not dirty the pulled image."""
+def create_overlay(backing: Path, overlay: Path, extra: str = "+8G") -> Path:
+    """Disposable qcow2 overlay so boot checks do not dirty the pulled image.
+
+    Ubuntu cloud images are nearly full; grow the virtual disk so cloud-init
+    can expand the rootfs before apt-get update.
+    """
     qemu_img = shutil.which("qemu-img")
     if not qemu_img:
         raise BootCheckError("qemu-img is required (install qemu-utils).")
     overlay.parent.mkdir(parents=True, exist_ok=True)
     if overlay.exists():
         overlay.unlink()
-    command = [
+    create = [
         qemu_img,
         "create",
         "-f",
@@ -240,7 +244,14 @@ def create_overlay(backing: Path, overlay: Path) -> Path:
         str(overlay),
     ]
     try:
-        subprocess.run(command, check=True, text=True, capture_output=True)
+        subprocess.run(create, check=True, text=True, capture_output=True)
+        if extra:
+            subprocess.run(
+                [qemu_img, "resize", str(overlay), extra],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
     except subprocess.CalledProcessError as exc:
         raise BootCheckError(f"qemu-img overlay failed: {exc.stderr or exc.stdout}") from exc
     return overlay

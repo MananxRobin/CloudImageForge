@@ -32,6 +32,10 @@ manage_etc_hosts: true
 package_update: false
 package_upgrade: false
 ssh_pwauth: false
+growpart:
+  mode: auto
+  devices: ["/"]
+resize_rootfs: true
 write_files:
   - path: {path}
     permissions: '0644'

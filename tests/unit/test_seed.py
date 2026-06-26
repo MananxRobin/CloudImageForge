@@ -18,6 +18,8 @@ def test_cloud_init_user_data_runs_apt_update_and_marks_result():
     assert MARKER_FAIL in user_data
     assert "archive.ubuntu.com" in user_data
     assert "poweroff" in user_data
+    assert "growpart:" in user_data
+    assert "resize_rootfs: true" in user_data
 
 
 def test_cloud_init_noble_clears_legacy_sources_list():
