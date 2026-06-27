@@ -13,7 +13,7 @@ fi
 outdir="${1:-dist}"
 mkdir -p "$outdir"
 
-dpkg-buildpackage -S -us -uc
+dpkg-buildpackage -S -us -uc -d
 
 mv -f ../cloudimageforge_*.dsc ../cloudimageforge_*.tar.* ../cloudimageforge_*.changes "$outdir/" 2>/dev/null || true
 ls -l "$outdir"/cloudimageforge_*
