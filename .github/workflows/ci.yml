@@ -171,3 +171,15 @@ jobs:
           key: pbuilder-noble-${{ runner.os }}
       - name: Build ciforge-hello via pbuilder
         run: bash scripts/ci-pbuilder.sh
+
+  debian-source:
+    name: Debian source package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native .dsc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev debhelper dh-python python3-all python3-setuptools python3-pytest
+          bash scripts/build-source-package.sh dist
+          test -f dist/cloudimageforge_0.1.0.dsc

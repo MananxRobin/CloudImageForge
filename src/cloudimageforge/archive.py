@@ -14,7 +14,7 @@ from cloudimageforge.exceptions import ArchiveAPIError
 from cloudimageforge.releases import UbuntuRelease, get_release
 
 LAUNCHPAD_PRIMARY = "https://api.launchpad.net/devel/ubuntu/+archive/primary"
-USER_AGENT = "CloudImageForge/0.1.0 (+https://github.com/canonical-community/cloudimageforge)"
+USER_AGENT = "CloudImageForge/0.1.0 (+https://github.com/MananxRobin/CloudImageForge)"
 
 Fetch = Callable[[str], Any]
 

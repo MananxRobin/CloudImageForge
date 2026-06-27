@@ -2,9 +2,14 @@ include README.md
 include LICENSE
 include CONTRIBUTING.md
 include Makefile
+include pyproject.toml
 recursive-include src/cloudimageforge/data *.json
 recursive-include debian *
 recursive-include docs *
 recursive-include examples *
 recursive-include tests *
 recursive-include scripts *
+global-exclude *.py[cod]
+global-exclude .DS_Store
+recursive-exclude * __pycache__
+recursive-exclude * *.egg-info

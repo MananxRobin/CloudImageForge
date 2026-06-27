@@ -1,5 +1,8 @@
 # CloudImageForge
 
+[![CI](https://github.com/MananxRobin/CloudImageForge/actions/workflows/ci.yml/badge.svg)](https://github.com/MananxRobin/CloudImageForge/actions)
+[![PyPI](https://img.shields.io/pypi/v/cloudimageforge)](https://pypi.org/project/cloudimageforge/)
+
 Python on Linux tool for Ubuntu 22.04 (jammy) and 24.04 (noble) cloud images:
 apt sources, Debian packaging (`dpkg-deb`, `sbuild`, `pbuilder`), and
 installability checks against the Ubuntu Archive (Launchpad
@@ -50,12 +53,32 @@ ciforge bootcheck --release jammy --backend simulate \
 ## Install
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python3 -m pip install cloudimageforge
 ciforge --help
 ```
 
-On Ubuntu, build the native Debian package with `dpkg-buildpackage -us -uc`
-and run `autopkgtest` via `debian/tests/`.
+From the `v0.1.0` tag (Git or a GitHub Release wheel):
+
+```bash
+python3 -m pip install git+https://github.com/MananxRobin/CloudImageForge.git@v0.1.0
+python3 -m pip install https://github.com/MananxRobin/CloudImageForge/releases/download/v0.1.0/cloudimageforge-0.1.0-py3-none-any.whl
+```
+
+On Ubuntu, build the native Debian source package (Launchpad / `dput`) and the binary:
+
+```bash
+bash scripts/build-source-package.sh dist   # .dsc + .tar.xz
+dpkg-buildpackage -us -uc                   # cloudimageforge_0.1.0_all.deb
+sudo apt install ../cloudimageforge_0.1.0_all.deb
+```
+
+For local development:
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+Run `autopkgtest` via `debian/tests/`.
 
 ## Pipeline
 
@@ -106,6 +129,7 @@ Live boot checks pull a jammy/noble image, inject apt sources (cloud-init NoClou
 | boot-qemu | `ciforge image pull` + QEMU NoCloud seed + serial `CIFORGE_BOOTCHECK` |
 | sbuild | `sbuild --chroot-mode=unshare -d noble` on `examples/ciforge-hello-src` |
 | pbuilder | `pbuilder create/build` noble chroot from the Ubuntu Archive |
+| debian-source | native `dpkg-buildpackage -S` (`.dsc` for Launchpad) |
 
 ```bash
 python3 -m pytest tests/unit tests/functional

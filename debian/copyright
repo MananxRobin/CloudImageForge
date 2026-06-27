@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: cloudimageforge
-Upstream-Contact: CloudImageForge Contributors <cloudimageforge@example.com>
-Source: https://github.com/canonical-community/cloudimageforge
+Upstream-Contact: Manan <mananambaliya7010@gmail.com>
+Source: https://github.com/MananxRobin/CloudImageForge
 
 Files: *
 Copyright: 2026 CloudImageForge Contributors

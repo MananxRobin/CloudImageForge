@@ -1,21 +1,22 @@
 Source: cloudimageforge
 Section: python
 Priority: optional
-Maintainer: CloudImageForge Contributors <cloudimageforge@example.com>
+Maintainer: Manan <mananambaliya7010@gmail.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                python3-all,
                python3-setuptools,
                python3-pytest
 Standards-Version: 4.7.0
-Homepage: https://github.com/canonical-community/cloudimageforge
-Vcs-Git: https://github.com/canonical-community/cloudimageforge.git
-Vcs-Browser: https://github.com/canonical-community/cloudimageforge
+Homepage: https://github.com/MananxRobin/CloudImageForge
+Vcs-Git: https://github.com/MananxRobin/CloudImageForge.git
+Vcs-Browser: https://github.com/MananxRobin/CloudImageForge
 Rules-Requires-Root: no
 
 Package: cloudimageforge
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}
+Provides: python3-cloudimageforge
 Recommends: qemu-system-x86, qemu-utils, uidmap
 Suggests: sbuild, pbuilder, lxd | lxd-installer
 Description: Ubuntu 22.04/24.04 cloud image and deb packaging pipeline
