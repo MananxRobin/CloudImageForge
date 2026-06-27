@@ -3,6 +3,7 @@ include LICENSE
 include CONTRIBUTING.md
 include Makefile
 include pyproject.toml
+include bin/ciforge
 recursive-include src/cloudimageforge/data *.json
 recursive-include debian *
 recursive-include docs *

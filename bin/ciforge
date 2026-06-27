@@ -1,0 +1,7 @@
+#!/bin/sh
+# Run ciforge from a git checkout. No pip.
+set -eu
+root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+PYTHONPATH="$root/src${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+exec python3 -m cloudimageforge "$@"

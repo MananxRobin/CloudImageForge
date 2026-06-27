@@ -1,9 +1,7 @@
 PYTHON ?= python3
+export PYTHONPATH := src
 
-.PHONY: install test functional sysadmin package
-
-install:
-	$(PYTHON) -m pip install -e ".[dev]"
+.PHONY: test functional sysadmin package
 
 test:
 	$(PYTHON) -m pytest tests/unit tests/functional

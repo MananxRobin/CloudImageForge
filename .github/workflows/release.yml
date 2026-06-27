@@ -7,53 +7,23 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   github:
-    name: GitHub Release (wheel + Debian source)
+    name: GitHub Release (Debian source)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Build sdist and wheel
-        run: |
-          python -m pip install -U build
-          python -m build --outdir dist/pypi
       - name: Build Debian source package
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev debhelper dh-python python3-all python3-setuptools python3-pytest
-          bash scripts/build-source-package.sh dist/debian
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
+          bash scripts/build-source-package.sh dist
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            dist/pypi/*
-            dist/debian/*
-
-  pypi:
-    name: Publish to PyPI
-    needs: github
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: artifacts
-      - name: Publish wheels
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: artifacts/pypi
-          skip-existing: true
+            dist/*.dsc
+            dist/*.tar.xz
+            dist/*.changes

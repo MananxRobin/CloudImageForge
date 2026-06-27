@@ -37,12 +37,6 @@ classifiers = [
 ]
 dependencies = []
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4",
-    "pytest-cov>=4.1",
-]
-
 [project.scripts]
 ciforge = "cloudimageforge.cli:main"
 
@@ -52,7 +46,6 @@ Documentation = "https://github.com/MananxRobin/CloudImageForge#readme"
 Issues = "https://github.com/MananxRobin/CloudImageForge/issues"
 Source = "https://github.com/MananxRobin/CloudImageForge"
 Changelog = "https://github.com/MananxRobin/CloudImageForge/releases"
-PyPI = "https://pypi.org/project/cloudimageforge/"
 
 [tool.setuptools.packages.find]
 where = ["src"]

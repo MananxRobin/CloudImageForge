@@ -14,7 +14,8 @@ series before it can leave staging:
 | noble  | 24.04   | DEB822 `ubuntu.sources` | qemu, lxd, aws, azure, gcp |
 
 ```bash
-python3 -m pip install -e ".[dev]"
+sudo apt install python3-pytest
+export PYTHONPATH=src PATH="$PWD/bin:$PATH"
 python3 -m pytest
 ciforge validate --control debian/control --releases jammy,noble
 ciforge bootcheck --release jammy --backend simulate

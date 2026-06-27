@@ -1,7 +1,6 @@
 # CloudImageForge
 
 [![CI](https://github.com/MananxRobin/CloudImageForge/actions/workflows/ci.yml/badge.svg)](https://github.com/MananxRobin/CloudImageForge/actions)
-[![PyPI](https://img.shields.io/pypi/v/cloudimageforge)](https://pypi.org/project/cloudimageforge/)
 
 Python on Linux tool for Ubuntu 22.04 (jammy) and 24.04 (noble) cloud images:
 apt sources, Debian packaging (`dpkg-deb`, `sbuild`, `pbuilder`), and
@@ -52,30 +51,23 @@ ciforge bootcheck --release jammy --backend simulate \
 
 ## Install
 
-```bash
-python3 -m pip install cloudimageforge
-ciforge --help
-```
-
-From the `v0.1.0` tag (Git or a GitHub Release wheel):
+On Ubuntu, build the native Debian package (Launchpad / `dput`) and install it:
 
 ```bash
-python3 -m pip install git+https://github.com/MananxRobin/CloudImageForge.git@v0.1.0
-python3 -m pip install https://github.com/MananxRobin/CloudImageForge/releases/download/v0.1.0/cloudimageforge-0.1.0-py3-none-any.whl
-```
-
-On Ubuntu, build the native Debian source package (Launchpad / `dput`) and the binary:
-
-```bash
+sudo apt install dpkg-dev debhelper dh-python python3-all python3-setuptools python3-pytest
 bash scripts/build-source-package.sh dist   # .dsc + .tar.xz
 dpkg-buildpackage -us -uc                   # cloudimageforge_0.1.0_all.deb
 sudo apt install ../cloudimageforge_0.1.0_all.deb
+ciforge --help
 ```
 
-For local development:
+From a git checkout, run the tree directly:
 
 ```bash
-python3 -m pip install -e ".[dev]"
+export PYTHONPATH=src PATH="$PWD/bin:$PATH"
+sudo apt install python3-pytest
+ciforge --help
+python3 -m pytest tests/unit tests/functional
 ```
 
 Run `autopkgtest` via `debian/tests/`.
